@@ -2,48 +2,65 @@ import streamlit as st
 import requests
 import google.generativeai as genai
 import pandas as pd 
+from bs4 import BeautifulSoup # A nossa nova ferramenta "Hacker"
 
-# 1. Configuração da IA 
+# 1. Configuração da IA
 CHAVE_API_GEMINI = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=CHAVE_API_GEMINI)
 modelo_ia = genai.GenerativeModel('gemini-1.5-pro')
 
 def analisar_mercado(produto):
-    url_search = "https://api.mercadolibre.com/sites/MLB/search"
-    params = {"q": produto, "sort": "relevance", "limit": 5}
+    # Formata o texto para a URL do site visual do Mercado Livre
+    produto_url = produto.replace(" ", "-")
+    url_search = f"https://lista.mercadolivre.com.br/{produto_url}"
     
-    # Novo disfarce: Fingir ser uma ferramenta oficial de testes de API (Postman)
+    # O nosso disfarce de navegador humano
     headers = {
-        "Accept": "application/json",
-        "User-Agent": "PostmanRuntime/7.36.1"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "pt-BR,pt;q=0.9",
+        "Referer": "https://www.mercadolivre.com.br/"
     }
     
     try:
-        response = requests.get(url_search, params=params, headers=headers)
+        # Em vez de pedir à API, vamos carregar a página web visual inteira
+        response = requests.get(url_search, headers=headers)
         
-        # AVISO DE BLOQUEIO: Se o ML barrar a pesquisa, agora ele vai avisar na tela!
         if response.status_code != 200:
-            return f"🚫 Bloqueio do Mercado Livre (Erro {response.status_code}): O servidor barrou a nossa entrada. Mensagem do ML: {response.text}", None
+            return f"🚫 Bloqueio do servidor (Erro {response.status_code}): O Mercado Livre barrou o IP da nuvem.", None
             
-        resultados = response.json().get("results", [])
-    except Exception as e:
-        return f"Erro na conexão: {e}", None
+        # O BeautifulSoup vai ler o código HTML da página
+        soup = BeautifulSoup(response.text, 'html.parser')
         
-    if not resultados:
-        return "Nenhum produto encontrado. Tente um termo menos específico.", None
+        # Procuramos as "caixinhas" dos produtos na tela
+        anuncios = soup.find_all('li', class_='ui-search-layout__item')
+        if not anuncios:
+             anuncios = soup.find_all('div', class_='ui-search-result__wrapper')
+             
+        if not anuncios:
+            return "Nenhum produto encontrado. A página mudou o visual ou a nuvem foi detectada.", None
+            
+        dados_para_ia = f"Produto analisado: {produto}\n\nTop 5 Anúncios:\n"
+        nomes_anuncios = []
+        precos_anuncios = []
+        
+        # Pegamos os 5 primeiros que apareceram na tela
+        for i, item in enumerate(anuncios[:5], 1):
+            titulo_elem = item.find('h2')
+            titulo = titulo_elem.text if titulo_elem else "Sem título"
+            
+            preco_elem = item.find('span', class_='andes-money-amount__fraction')
+            if preco_elem:
+                preco_str = preco_elem.text.replace('.', '') # Remove o ponto de milhar
+                preco = float(preco_str)
+            else:
+                preco = 0.0
+                
+            dados_para_ia += f"{i}. {titulo} - R$ {preco:.2f}\n"
+            nomes_anuncios.append(f"Top {i}") 
+            precos_anuncios.append(preco)
 
-    dados_para_ia = f"Produto analisado: {produto}\n\nTop 5 Anúncios:\n"
-    
-    nomes_anuncios = []
-    precos_anuncios = []
-    
-    for i, item in enumerate(resultados, 1):
-        titulo = item.get("title")
-        preco = item.get("price")
-        
-        dados_para_ia += f"{i}. {titulo} - R$ {preco:.2f}\n"
-        nomes_anuncios.append(f"Top {i}") 
-        precos_anuncios.append(preco)
+    except Exception as e:
+        return f"Erro na leitura: {e}", None
 
     prompt = f"""
     És um especialista no Mercado Livre. Analise estes 5 anúncios:
@@ -87,7 +104,7 @@ if st.button("Analisar Mercado 🚀"):
                 st.markdown("### 📊 Relatório de Viabilidade da IA")
                 st.info(relatorio)
             else:
-                st.error(relatorio) # Agora a caixa vermelha mostrará o erro exato do ML
+                st.error(relatorio)
                 
     else:
         st.warning("Por favor, digite o nome de um produto antes de analisar.")

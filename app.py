@@ -11,6 +11,14 @@ modelo_ia = genai.GenerativeModel('gemini-1.5-pro')
 def analisar_mercado(produto):
     url_search = "https://api.mercadolibre.com/sites/MLB/search"
     params = {"q": produto, "sort": "relevance", "limit": 5}
+
+    # O disfarce de navegador para não ser bloqueado
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
+    try:
+        response = requests.get(url_search, params=params, headers=headers)
     
     try:
         response = requests.get(url_search, params=params)

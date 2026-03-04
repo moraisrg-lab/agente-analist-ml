@@ -2,7 +2,8 @@ import streamlit as st
 import requests
 import google.generativeai as genai
 import pandas as pd 
-from bs4 import BeautifulSoup # A nossa nova ferramenta "Hacker"
+from bs4 import BeautifulSoup
+import urllib.parse # Ferramenta nativa para criar links de túnel
 
 # 1. Configuração da IA
 CHAVE_API_GEMINI = st.secrets["GEMINI_API_KEY"]
@@ -10,26 +11,29 @@ genai.configure(api_key=CHAVE_API_GEMINI)
 modelo_ia = genai.GenerativeModel('gemini-1.5-pro')
 
 def analisar_mercado(produto):
-    # Formata o texto para a URL do site visual do Mercado Livre
+    # Prepara o link original do Mercado Livre
     produto_url = produto.replace(" ", "-")
-    url_search = f"https://lista.mercadolivre.com.br/{produto_url}"
+    url_alvo = f"https://lista.mercadolivre.com.br/{produto_url}"
     
-    # O nosso disfarce de navegador humano
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "pt-BR,pt;q=0.9",
-        "Referer": "https://www.mercadolivre.com.br/"
-    }
+    # O TRUQUE MESTRE: Colocamos o link do ML dentro do túnel do AllOrigins
+    url_proxy = f"https://api.allorigins.win/get?url={urllib.parse.quote(url_alvo)}"
     
     try:
-        # Em vez de pedir à API, vamos carregar a página web visual inteira
-        response = requests.get(url_search, headers=headers)
+        # Pedimos ao túnel para ir buscar a página
+        response = requests.get(url_proxy)
         
         if response.status_code != 200:
-            return f"🚫 Bloqueio do servidor (Erro {response.status_code}): O Mercado Livre barrou o IP da nuvem.", None
+            return "🚫 Erro no túnel de conexão. Tente novamente mais tarde.", None
             
-        # O BeautifulSoup vai ler o código HTML da página
-        soup = BeautifulSoup(response.text, 'html.parser')
+        # O túnel devolve um pacote onde a página do ML está dentro de 'contents'
+        dados_tunel = response.json()
+        html_da_pagina = dados_tunel.get('contents', '')
+        
+        if not html_da_pagina:
+            return "🚫 O Mercado Livre bloqueou até o nosso túnel! A segurança deles está extrema hoje.", None
+            
+        # O BeautifulSoup vai ler o código da página que o túnel trouxe
+        soup = BeautifulSoup(html_da_pagina, 'html.parser')
         
         # Procuramos as "caixinhas" dos produtos na tela
         anuncios = soup.find_all('li', class_='ui-search-layout__item')
@@ -37,20 +41,20 @@ def analisar_mercado(produto):
              anuncios = soup.find_all('div', class_='ui-search-result__wrapper')
              
         if not anuncios:
-            return "Nenhum produto encontrado. A página mudou o visual ou a nuvem foi detectada.", None
+            return "Nenhum produto encontrado. O visual do site mudou ou a proteção contra robôs camuflou os preços.", None
             
         dados_para_ia = f"Produto analisado: {produto}\n\nTop 5 Anúncios:\n"
         nomes_anuncios = []
         precos_anuncios = []
         
-        # Pegamos os 5 primeiros que apareceram na tela
+        # Pegamos os 5 primeiros anúncios da página
         for i, item in enumerate(anuncios[:5], 1):
             titulo_elem = item.find('h2')
             titulo = titulo_elem.text if titulo_elem else "Sem título"
             
             preco_elem = item.find('span', class_='andes-money-amount__fraction')
             if preco_elem:
-                preco_str = preco_elem.text.replace('.', '') # Remove o ponto de milhar
+                preco_str = preco_elem.text.replace('.', '')
                 preco = float(preco_str)
             else:
                 preco = 0.0
@@ -60,7 +64,7 @@ def analisar_mercado(produto):
             precos_anuncios.append(preco)
 
     except Exception as e:
-        return f"Erro na leitura: {e}", None
+        return f"Erro na leitura dos dados: {e}", None
 
     prompt = f"""
     És um especialista no Mercado Livre. Analise estes 5 anúncios:
@@ -91,7 +95,7 @@ produto_input = st.text_input("Qual produto deseja analisar?", placeholder="Ex: 
 
 if st.button("Analisar Mercado 🚀"):
     if produto_input:
-        with st.spinner(f"A investigar os concorrentes de '{produto_input}' e a consultar a IA..."):
+        with st.spinner(f"A usar um túnel seguro para investigar '{produto_input}'... Isto pode levar alguns segundos."):
             
             relatorio, dados_grafico = analisar_mercado(produto_input)
             

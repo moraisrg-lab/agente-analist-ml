@@ -6,7 +6,9 @@ import random
 # 1. Configuração da IA
 CHAVE_API_GEMINI = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=CHAVE_API_GEMINI)
-modelo_ia = genai.GenerativeModel('gemini-1.5-pro')
+
+# A CORREÇÃO ESTÁ AQUI: Usando o nome universal e mais estável do modelo
+modelo_ia = genai.GenerativeModel('gemini-pro')
 
 def analisar_mercado_simulado(produto):
     # SIMULADOR: Criando dados fictícios para contornar o bloqueio do ML

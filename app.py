@@ -3,7 +3,7 @@ import requests
 import google.generativeai as genai
 import pandas as pd 
 
-# 1. Configuração da IA (A usar os secrets do Streamlit Cloud)
+# 1. Configuração da IA 
 CHAVE_API_GEMINI = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=CHAVE_API_GEMINI)
 modelo_ia = genai.GenerativeModel('gemini-1.5-pro')
@@ -12,24 +12,28 @@ def analisar_mercado(produto):
     url_search = "https://api.mercadolibre.com/sites/MLB/search"
     params = {"q": produto, "sort": "relevance", "limit": 5}
     
-    # O disfarce de navegador para não ser bloqueado pelo Mercado Livre
+    # Novo disfarce: Fingir ser uma ferramenta oficial de testes de API (Postman)
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "Accept": "application/json",
+        "User-Agent": "PostmanRuntime/7.36.1"
     }
     
     try:
-        # A requisição agora vai com o "disfarce" (headers)
         response = requests.get(url_search, params=params, headers=headers)
+        
+        # AVISO DE BLOQUEIO: Se o ML barrar a pesquisa, agora ele vai avisar na tela!
+        if response.status_code != 200:
+            return f"🚫 Bloqueio do Mercado Livre (Erro {response.status_code}): O servidor barrou a nossa entrada. Mensagem do ML: {response.text}", None
+            
         resultados = response.json().get("results", [])
     except Exception as e:
-        return f"Erro na pesquisa: {e}", None
+        return f"Erro na conexão: {e}", None
         
     if not resultados:
         return "Nenhum produto encontrado. Tente um termo menos específico.", None
 
     dados_para_ia = f"Produto analisado: {produto}\n\nTop 5 Anúncios:\n"
     
-    # Listas para guardar os dados do gráfico
     nomes_anuncios = []
     precos_anuncios = []
     
@@ -37,10 +41,7 @@ def analisar_mercado(produto):
         titulo = item.get("title")
         preco = item.get("price")
         
-        # Alimentar os dados do texto
         dados_para_ia += f"{i}. {titulo} - R$ {preco:.2f}\n"
-        
-        # Alimentar os dados do Gráfico (Usamos nomes curtos para o gráfico não ficar feio)
         nomes_anuncios.append(f"Top {i}") 
         precos_anuncios.append(preco)
 
@@ -53,13 +54,11 @@ def analisar_mercado(produto):
     
     resposta = modelo_ia.generate_content(prompt)
     
-    # --- PREPARAR OS DADOS DO GRÁFICO COM PANDAS ---
     tabela_grafico = pd.DataFrame({
         "Anúncios": nomes_anuncios,
         "Preço (R$)": precos_anuncios
     }).set_index("Anúncios")
     
-    # Agora a função devolve DUAS coisas: o texto da IA e a tabela do gráfico
     return resposta.text, tabela_grafico
 
 # ==========================================
@@ -77,21 +76,18 @@ if st.button("Analisar Mercado 🚀"):
     if produto_input:
         with st.spinner(f"A investigar os concorrentes de '{produto_input}' e a consultar a IA..."):
             
-            # Recebe o relatório E os dados do gráfico
             relatorio, dados_grafico = analisar_mercado(produto_input)
             
             if dados_grafico is not None:
                 st.success("Análise concluída com sucesso!")
                 
-                # --- EXIBE O GRÁFICO PRIMEIRO ---
                 st.markdown("### 📈 Comparativo de Preços (Top 5)")
                 st.bar_chart(dados_grafico)
                 
-                # --- EXIBE O RELATÓRIO DEPOIS ---
                 st.markdown("### 📊 Relatório de Viabilidade da IA")
                 st.info(relatorio)
             else:
-                st.error(relatorio)
+                st.error(relatorio) # Agora a caixa vermelha mostrará o erro exato do ML
                 
     else:
         st.warning("Por favor, digite o nome de um produto antes de analisar.")

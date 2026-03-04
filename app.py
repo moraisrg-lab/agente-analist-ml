@@ -1,86 +1,58 @@
 import streamlit as st
-import requests
 import google.generativeai as genai
 import pandas as pd 
-from bs4 import BeautifulSoup
-import urllib.parse # Ferramenta nativa para criar links de túnel
+import random
 
 # 1. Configuração da IA
 CHAVE_API_GEMINI = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=CHAVE_API_GEMINI)
 modelo_ia = genai.GenerativeModel('gemini-1.5-pro')
 
-def analisar_mercado(produto):
-    # Prepara o link original do Mercado Livre
-    produto_url = produto.replace(" ", "-")
-    url_alvo = f"https://lista.mercadolivre.com.br/{produto_url}"
+def analisar_mercado_simulado(produto):
+    # SIMULADOR: Criando dados fictícios para contornar o bloqueio do ML
+    preco_base = random.uniform(50.0, 300.0) 
     
-    # O TRUQUE MESTRE: Colocamos o link do ML dentro do túnel do AllOrigins
-    url_proxy = f"https://api.allorigins.win/get?url={urllib.parse.quote(url_alvo)}"
+    resultados_simulados = [
+        {"title": f"{produto} - Original (Mais Vendido)", "price": preco_base * 1.1},
+        {"title": f"{produto} - Padrão Nacional", "price": preco_base * 0.9},
+        {"title": f"{produto} - Importado Premium", "price": preco_base * 1.5},
+        {"title": f"{produto} - Edição Básica", "price": preco_base * 0.7},
+        {"title": f"{produto} - Kit Completo", "price": preco_base * 1.8},
+    ]
+
+    dados_para_ia = f"Produto analisado: {produto}\n\nTop 5 Anúncios (CENÁRIO SIMULADO):\n"
+    nomes_anuncios = []
+    precos_anuncios = []
     
-    try:
-        # Pedimos ao túnel para ir buscar a página
-        response = requests.get(url_proxy)
+    for i, item in enumerate(resultados_simulados, 1):
+        titulo = item["title"]
+        preco = item["price"]
         
-        if response.status_code != 200:
-            return "🚫 Erro no túnel de conexão. Tente novamente mais tarde.", None
-            
-        # O túnel devolve um pacote onde a página do ML está dentro de 'contents'
-        dados_tunel = response.json()
-        html_da_pagina = dados_tunel.get('contents', '')
-        
-        if not html_da_pagina:
-            return "🚫 O Mercado Livre bloqueou até o nosso túnel! A segurança deles está extrema hoje.", None
-            
-        # O BeautifulSoup vai ler o código da página que o túnel trouxe
-        soup = BeautifulSoup(html_da_pagina, 'html.parser')
-        
-        # Procuramos as "caixinhas" dos produtos na tela
-        anuncios = soup.find_all('li', class_='ui-search-layout__item')
-        if not anuncios:
-             anuncios = soup.find_all('div', class_='ui-search-result__wrapper')
-             
-        if not anuncios:
-            return "Nenhum produto encontrado. O visual do site mudou ou a proteção contra robôs camuflou os preços.", None
-            
-        dados_para_ia = f"Produto analisado: {produto}\n\nTop 5 Anúncios:\n"
-        nomes_anuncios = []
-        precos_anuncios = []
-        
-        # Pegamos os 5 primeiros anúncios da página
-        for i, item in enumerate(anuncios[:5], 1):
-            titulo_elem = item.find('h2')
-            titulo = titulo_elem.text if titulo_elem else "Sem título"
-            
-            preco_elem = item.find('span', class_='andes-money-amount__fraction')
-            if preco_elem:
-                preco_str = preco_elem.text.replace('.', '')
-                preco = float(preco_str)
-            else:
-                preco = 0.0
-                
-            dados_para_ia += f"{i}. {titulo} - R$ {preco:.2f}\n"
-            nomes_anuncios.append(f"Top {i}") 
-            precos_anuncios.append(preco)
+        dados_para_ia += f"{i}. {titulo} - R$ {preco:.2f}\n"
+        nomes_anuncios.append(f"Top {i}") 
+        precos_anuncios.append(preco)
 
-    except Exception as e:
-        return f"Erro na leitura dos dados: {e}", None
-
+    # Prompt instruindo a IA a tratar os dados simulados de forma profissional
     prompt = f"""
-    És um especialista no Mercado Livre. Analise estes 5 anúncios:
+    Você é um especialista em e-commerce. Eu gerei um cenário de mercado simulado com 5 anúncios para o produto pesquisado:
     {dados_para_ia}
     
-    Escreva um relatório rápido de viabilidade, focando no preço médio e na dificuldade de entrada. Formate a sua resposta usando Markdown (títulos, negritos e listas).
+    Escreva um relatório de viabilidade rápido, focando no preço médio, na variação (do mais barato ao mais caro) e sugerindo uma estratégia de entrada. 
+    Formate a sua resposta usando Markdown (títulos, negritos e listas).
     """
     
-    resposta = modelo_ia.generate_content(prompt)
+    try:
+        resposta = modelo_ia.generate_content(prompt)
+        texto_ia = resposta.text
+    except Exception as e:
+        return f"Erro ao comunicar com a IA: {e}", None
     
     tabela_grafico = pd.DataFrame({
         "Anúncios": nomes_anuncios,
         "Preço (R$)": precos_anuncios
     }).set_index("Anúncios")
     
-    return resposta.text, tabela_grafico
+    return texto_ia, tabela_grafico
 
 # ==========================================
 # 3. A INTERFACE GRÁFICA (STREAMLIT)
@@ -89,24 +61,28 @@ st.set_page_config(page_title="Agente Mercado Livre", page_icon="📦", layout="
 
 st.title("📦 Agente Inteligente: Mercado Livre")
 st.markdown("Descubra a viabilidade de qualquer produto em segundos usando Inteligência Artificial.")
+
+# Aviso de que estamos em Modo Simulação
+st.info("⚠️ **Modo Simulador Ativo:** Devido às políticas de segurança do Mercado Livre, este agente está gerando cenários de mercado simulados para demonstrar a capacidade de análise da Inteligência Artificial.")
+
 st.divider()
 
 produto_input = st.text_input("Qual produto deseja analisar?", placeholder="Ex: Garrafa Térmica 1L Inox")
 
 if st.button("Analisar Mercado 🚀"):
     if produto_input:
-        with st.spinner(f"A usar um túnel seguro para investigar '{produto_input}'... Isto pode levar alguns segundos."):
+        with st.spinner(f"A criar cenário simulado para '{produto_input}' e a consultar a IA..."):
             
-            relatorio, dados_grafico = analisar_mercado(produto_input)
+            relatorio, dados_grafico = analisar_mercado_simulado(produto_input)
             
             if dados_grafico is not None:
-                st.success("Análise concluída com sucesso!")
+                st.success("Análise de cenário concluída!")
                 
-                st.markdown("### 📈 Comparativo de Preços (Top 5)")
+                st.markdown("### 📈 Comparativo de Preços (Simulação)")
                 st.bar_chart(dados_grafico)
                 
                 st.markdown("### 📊 Relatório de Viabilidade da IA")
-                st.info(relatorio)
+                st.write(relatorio) # Exibe a resposta final da IA
             else:
                 st.error(relatorio)
                 

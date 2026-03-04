@@ -56,4 +56,42 @@ def analisar_mercado(produto):
     # --- PREPARAR OS DADOS DO GRÁFICO COM PANDAS ---
     tabela_grafico = pd.DataFrame({
         "Anúncios": nomes_anuncios,
-        "Preço (R$)": precos_an
+        "Preço (R$)": precos_anuncios
+    }).set_index("Anúncios")
+    
+    # Agora a função devolve DUAS coisas: o texto da IA e a tabela do gráfico
+    return resposta.text, tabela_grafico
+
+# ==========================================
+# 3. A INTERFACE GRÁFICA (STREAMLIT)
+# ==========================================
+st.set_page_config(page_title="Agente Mercado Livre", page_icon="📦", layout="centered")
+
+st.title("📦 Agente Inteligente: Mercado Livre")
+st.markdown("Descubra a viabilidade de qualquer produto em segundos usando Inteligência Artificial.")
+st.divider()
+
+produto_input = st.text_input("Qual produto deseja analisar?", placeholder="Ex: Garrafa Térmica 1L Inox")
+
+if st.button("Analisar Mercado 🚀"):
+    if produto_input:
+        with st.spinner(f"A investigar os concorrentes de '{produto_input}' e a consultar a IA..."):
+            
+            # Recebe o relatório E os dados do gráfico
+            relatorio, dados_grafico = analisar_mercado(produto_input)
+            
+            if dados_grafico is not None:
+                st.success("Análise concluída com sucesso!")
+                
+                # --- EXIBE O GRÁFICO PRIMEIRO ---
+                st.markdown("### 📈 Comparativo de Preços (Top 5)")
+                st.bar_chart(dados_grafico)
+                
+                # --- EXIBE O RELATÓRIO DEPOIS ---
+                st.markdown("### 📊 Relatório de Viabilidade da IA")
+                st.info(relatorio)
+            else:
+                st.error(relatorio)
+                
+    else:
+        st.warning("Por favor, digite o nome de um produto antes de analisar.")

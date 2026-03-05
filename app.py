@@ -7,8 +7,28 @@ import random
 CHAVE_API_GEMINI = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=CHAVE_API_GEMINI)
 
-# A CORREÇÃO DEFINITIVA: Usando o modelo Flash (o mais recente e estável do Google)
-modelo_ia = genai.GenerativeModel('gemini-1.5-flash')
+# -------------------------------------------------------------------
+# A SOLUÇÃO INTELIGENTE: AUTODESCOBERTA DE MODELOS
+# O código vai perguntar ao Google quais modelos a sua chave tem 
+# acesso e vai selecionar o melhor automaticamente!
+# -------------------------------------------------------------------
+try:
+    # Pede a lista de todos os modelos que escrevem textos
+    modelos_disponiveis = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    
+    # Procura pelo Flash ou Pro, se não achar, pega o primeiro da lista
+    nome_do_modelo = modelos_disponiveis[0] 
+    for m in modelos_disponiveis:
+        if "gemini-1.5-flash" in m:
+            nome_do_modelo = m
+            break
+        elif "gemini-1.0-pro" in m:
+            nome_do_modelo = m
+            
+    modelo_ia = genai.GenerativeModel(nome_do_modelo)
+except Exception as e:
+    # Se falhar, usa um modelo de segurança
+    modelo_ia = genai.GenerativeModel('gemini-1.5-flash')
 
 def analisar_mercado_simulado(produto):
     # SIMULADOR: Criando dados fictícios para contornar o bloqueio do ML
@@ -34,7 +54,6 @@ def analisar_mercado_simulado(produto):
         nomes_anuncios.append(f"Top {i}") 
         precos_anuncios.append(preco)
 
-    # Prompt instruindo a IA a tratar os dados simulados de forma profissional
     prompt = f"""
     Você é um especialista em e-commerce. Eu gerei um cenário de mercado simulado com 5 anúncios para o produto pesquisado:
     {dados_para_ia}
@@ -64,7 +83,6 @@ st.set_page_config(page_title="Agente Mercado Livre", page_icon="📦", layout="
 st.title("📦 Agente Inteligente: Mercado Livre")
 st.markdown("Descubra a viabilidade de qualquer produto em segundos usando Inteligência Artificial.")
 
-# Aviso de que estamos em Modo Simulação
 st.info("⚠️ **Modo Simulador Ativo:** Devido às políticas de segurança do Mercado Livre, este agente está gerando cenários de mercado simulados para demonstrar a capacidade de análise da Inteligência Artificial.")
 
 st.divider()
@@ -73,7 +91,7 @@ produto_input = st.text_input("Qual produto deseja analisar?", placeholder="Ex: 
 
 if st.button("Analisar Mercado 🚀"):
     if produto_input:
-        with st.spinner(f"A criar cenário simulado para '{produto_input}' e a consultar a IA..."):
+        with st.spinner(f"A criar cenário simulado para '{produto_input}' e a ligar o cérebro da IA..."):
             
             relatorio, dados_grafico = analisar_mercado_simulado(produto_input)
             

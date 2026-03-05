@@ -22,7 +22,7 @@ try:
 except:
     modelo_ia = genai.GenerativeModel('gemini-1.5-flash')
 
-# 2. O Crachá Oficial: Função para pegar o Token de Acesso do Mercado Livre
+# 2. O Crachá Oficial: Função para pegar o Token de Acesso do ML
 def obter_token_ml():
     url = "https://api.mercadolibre.com/oauth/token"
     payload = {
@@ -47,13 +47,16 @@ def analisar_mercado_real(produto):
     token = obter_token_ml()
     
     if not token:
-        return "🚫 Erro de Autenticação: O Mercado Livre não aceitou as chaves (ID e Secret). Verifique no painel do Streamlit.", None
+        return "🚫 Erro de Autenticação: O Mercado Livre não aceitou as chaves (ID e Secret).", None
 
     url_search = "https://api.mercadolibre.com/sites/MLB/search"
     params = {"q": produto, "sort": "relevance", "limit": 5}
     
-    # Entrando pela porta da frente com o nosso Token Oficial
-    headers = {"Authorization": f"Bearer {token}"}
+    # O TRUQUE DE MESTRE: O Crachá Oficial (Token) + O Disfarce de Humano (User-Agent)
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
     
     try:
         response = requests.get(url_search, params=params, headers=headers)

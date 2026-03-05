@@ -7,8 +7,8 @@ import random
 CHAVE_API_GEMINI = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=CHAVE_API_GEMINI)
 
-# A CORREÇÃO ESTÁ AQUI: Usando o nome universal e mais estável do modelo
-modelo_ia = genai.GenerativeModel('gemini-pro')
+# A CORREÇÃO DEFINITIVA: Usando o modelo Flash (o mais recente e estável do Google)
+modelo_ia = genai.GenerativeModel('gemini-1.5-flash')
 
 def analisar_mercado_simulado(produto):
     # SIMULADOR: Criando dados fictícios para contornar o bloqueio do ML
@@ -84,7 +84,7 @@ if st.button("Analisar Mercado 🚀"):
                 st.bar_chart(dados_grafico)
                 
                 st.markdown("### 📊 Relatório de Viabilidade da IA")
-                st.write(relatorio) # Exibe a resposta final da IA
+                st.write(relatorio)
             else:
                 st.error(relatorio)
                 
